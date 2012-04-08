@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/targetMenu" android:title="Define target" android:titleCondensed="Target" android:icon="@+drawable/ic_menu_resize"></item>
+    <item android:icon="@+drawable/ic_menu_settings" android:title="Settings" android:titleCondensed="Settings" android:id="@+id/settingsMenu"></item>
+    
+</menu>

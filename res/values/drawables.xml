@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <drawable name="gpsInactive">#f00</drawable>
+    <drawable name="gpsActive">#0f0</drawable>
+</resources>

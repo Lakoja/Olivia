@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent" android:background="#fff">
+    <LinearLayout android:layout_width="fill_parent" android:orientation="vertical" android:id="@+id/mainLayout" android:layout_height="fill_parent" android:fadingEdge="horizontal">
+        <LinearLayout android:id="@+id/linearLayout4" android:layout_height="wrap_content" android:layout_width="fill_parent" android:paddingTop="2dp">
+            <LinearLayout android:id="@+id/linearLayout5" android:layout_width="wrap_content" android:orientation="vertical" android:layout_height="wrap_content" android:layout_weight="2">
+                <LinearLayout android:id="@+id/linearLayout2" android:layout_height="wrap_content" android:layout_width="fill_parent">
+                    <TextView style="@style/BwText" android:text="No" android:id="@+id/latitude" android:gravity="center_horizontal"></TextView>
+                    <TextView style="@style/BwText" android:text="fix" android:id="@+id/longitude" android:gravity="center_horizontal"></TextView>
+                    <ProgressBar style="?android:attr/progressBarStyleSmall" android:id="@+id/mapStateSpinner" android:layout_height="20dp" android:layout_width="20dp"></ProgressBar>
+                </LinearLayout>
+                <LinearLayout android:id="@+id/linearLayout3" android:layout_height="wrap_content" android:layout_width="fill_parent">
+                    <ImageView android:layout_height="20dp" android:src="@drawable/gpsInactive" android:id="@+id/gpsActive" android:layout_width="20dp"></ImageView>
+                    <TextView style="@style/BwText" android:id="@+id/targetDistance" android:paddingLeft="2dp" android:text="2m" android:layout_weight="1"></TextView>
+                    <TextView style="@style/BwText" android:id="@+id/targetBearing" android:layout_weight="1" android:text="150°"></TextView>
+                    <TextView style="@style/BwText" android:id="@+id/satellites" android:text="0/8" android:layout_weight="1"></TextView>
+                </LinearLayout>
+            </LinearLayout>
+            <ImageButton android:id="@+id/imageButton1" android:layout_height="wrap_content" android:layout_width="wrap_content" android:layout_weight="1" android:background="@drawable/vector_button" android:layout_margin="1dp" android:src="@drawable/ic_btn_arrow"></ImageButton>
+        </LinearLayout>
+        <LinearLayout android:layout_width="fill_parent" android:layout_height="wrap_content" android:id="@+id/dummyLayout" android:layout_weight="1">
+            <TextView android:layout_height="fill_parent" android:layout_width="fill_parent" android:id="@+id/dummyMap" android:text="Dummy Map" android:textColor="#000"></TextView>
+        </LinearLayout>
+        <LinearLayout android:id="@+id/linearLayout1" android:layout_height="wrap_content" android:layout_width="fill_parent" android:paddingTop="2dp">
+            <ImageButton android:layout_width="wrap_content" android:layout_weight="1" android:layout_height="wrap_content" android:src="@drawable/ic_btn_zoomminus" android:id="@+id/zoomOut" android:background="@drawable/vector_button" android:layout_margin="1dp"></ImageButton>
+            <ImageButton android:layout_height="wrap_content" android:layout_width="wrap_content" android:layout_weight="1" android:src="@drawable/ic_btn_zoomplus" android:id="@+id/zoomIn" android:background="@drawable/vector_button" android:layout_margin="1dp"></ImageButton>
+            <ImageButton android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_weight="1" android:src="@drawable/ic_btn_homing" android:id="@+id/homing" android:background="@drawable/vector_button" android:layout_margin="1dp"></ImageButton>
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>
