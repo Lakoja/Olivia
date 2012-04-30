@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <ListPreference android:summary="@string/gps_timeout_explain" android:key="gpsTimeout" android:title="@string/gps_timeout" android:entryValues="@array/timeoutValues" android:entries="@array/timeoutEntries" android:defaultValue="5"></ListPreference>
+    <CheckBoxPreference android:title="@string/sound_first_fix" android:key="soundFirstFix" android:defaultValue="false" android:summary="@string/sound_first_fix_explain"></CheckBoxPreference>
+    <ListPreference android:title="@string/battery_save" android:key="batterySave" android:entries="@array/batterySaveEntries" android:entryValues="@array/batterySaveValues" android:defaultValue="15" android:summary="@string/battery_save_explain"></ListPreference>
+    
+</PreferenceScreen>

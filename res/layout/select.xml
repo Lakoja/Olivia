@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+  xmlns:android="http://schemas.android.com/apk/res/android"
+  android:orientation="vertical"
+  android:layout_width="fill_parent"
+  android:layout_height="fill_parent" android:background="#fff">
+    <LinearLayout android:layout_width="fill_parent" android:id="@+id/linearLayout2" android:layout_height="wrap_content" android:orientation="vertical" android:layout_weight="1">
+      
+        <ListView android:id="@+id/android:list" android:layout_width="fill_parent" android:layout_height="fill_parent" android:cacheColorHint="#fff"></ListView>
+        <TextView android:id="@+id/android:empty" android:text="Empty" android:layout_width="fill_parent" android:layout_height="fill_parent"></TextView>
+    
+    </LinearLayout>
+  
+
+    <LinearLayout android:layout_width="fill_parent" android:id="@+id/linearLayout1" android:layout_height="wrap_content" android:layout_gravity="bottom">
+        <!-- <Button android:layout_width="wrap_content" android:id="@+id/selectOk" android:layout_height="wrap_content" android:text="Ok" android:layout_weight="1"></Button>-->
+        <LinearLayout android:layout_height="fill_parent" android:id="@+id/linearLayout3" android:layout_width="wrap_content" android:layout_weight="1" android:orientation="vertical">
+            <Button android:layout_height="wrap_content" android:id="@+id/selectCancel" android:layout_weight="1" android:layout_width="wrap_content" android:minWidth="160dp" android:layout_gravity="center_horizontal" android:text="@string/cancel"></Button>
+        </LinearLayout>
+    </LinearLayout>
+    
+</LinearLayout>

@@ -16,7 +16,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".TargetActivity" android:label="@string/target"></activity>
+        <activity android:name=".TargetActivity" android:label="@string/define_target"></activity>
+        <activity android:name=".FileSelectActivity" android:label="@string/select_file_title"></activity>
+        <activity android:name=".SettingsActivity" android:label="@string/settings_title"></activity>
 
     </application>
 </manifest>

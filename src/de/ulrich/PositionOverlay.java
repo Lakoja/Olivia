@@ -22,10 +22,13 @@ public class PositionOverlay extends ItemizedOverlay<OverlayItem> {
 	private GeoPoint geoPosition;
 	private float positionAccuracy;
 	private GeoPoint geoTarget;
+	private float orientation = -1;
+	
 	private Paint targetCirclePaint;
 	private Paint targetBackPaint;
 	private Paint positionCirclePaint;
 	private Paint positionBackPaint;
+	private Paint orientationPaint;
 
 	public PositionOverlay(Display display, MapView mv) {
 		super(null);
@@ -59,7 +62,9 @@ public class PositionOverlay extends ItemizedOverlay<OverlayItem> {
 		
 		positionBackPaint = new Paint(targetBackPaint);
 		positionBackPaint.setColor(Color.argb(90, 0, 0, 0));
-		
+			
+		orientationPaint = new Paint(positionBackPaint);
+		orientationPaint.setColor(Color.argb(90, 140, 75, 0)); // brown
 	}
 	
 	public GeoPoint getPosition() {
@@ -92,6 +97,17 @@ public class PositionOverlay extends ItemizedOverlay<OverlayItem> {
 		if (redraw)
 			requestRedraw();
 	}
+	
+	public void setOrientation(float ori) {
+		if (ori != orientation) {
+			boolean redraw = Math.floor(ori) != Math.floor(orientation);
+			
+			orientation = ori;
+			
+			if (redraw)
+				requestRedraw();
+		}
+	}
 
 	@Override
 	protected OverlayItem createItem(int idx) {
@@ -111,7 +127,19 @@ public class PositionOverlay extends ItemizedOverlay<OverlayItem> {
 			placePoint(geoTarget, false, canvas, projection, 
 					targetCirclePaint, targetBackPaint);
 		}
+		
+		if (orientation >= 0) {
+			placeOrientation(canvas, projection);
+		}
+		
+		float radius = circleRadius/2;
+		float x = father.getWidth() / 2.0f;
+		float y = father.getHeight() / 2.0f;
+		RectF centerCircle = new RectF(x-radius, y-radius, x+radius, y+radius);
+		canvas.drawOval(centerCircle, positionCirclePaint);
+
 	}
+
 
 	@Override
 	public int size() {
@@ -120,6 +148,9 @@ public class PositionOverlay extends ItemizedOverlay<OverlayItem> {
 			count++;
 		if (geoTarget != null)
 			count++;
+		if (orientation >= 0)
+			count++;
+		count++; // map center
 		return count;
 	}
 
@@ -129,64 +160,17 @@ public class PositionOverlay extends ItemizedOverlay<OverlayItem> {
 				
 		Point targetPoint = projection.toPixels(geo, null);
 
-		Point mapSize = new Point(father.getWidth(), father.getHeight()); 
+		Point mapSize = new Point(father.getWidth(), father.getHeight());
 		
 		boolean isOutside = false;
 		
 		// TODO map view can change size!
-		if (targetPoint.x < 0 || targetPoint.x >= mapSize.x
-				|| targetPoint.y < 0 || targetPoint.y >= mapSize.y) {
+		if (outside(targetPoint, mapSize)) {
 			
 			// is outside map area; calculate intersection with map border
 			isOutside = true;
 			
-			float centerx = mapSize.x / 2.0f;
-			float centery = mapSize.y / 2.0f;
-			
-			float diffx = targetPoint.x - centerx;
-			float diffy = targetPoint.y - centery;
-			
-			if (diffx == 0) {
-				targetPoint.x = (int)centerx;
-			
-				if (diffy < 0) // above				
-					targetPoint.y = 0;
-				else
-					targetPoint.y = mapSize.y;
-			} else if (diffy == 0) {
-				targetPoint.y = (int)centery;
-				
-				if (diffx > 0) // right
-					targetPoint.x = mapSize.x;
-				else
-					targetPoint.x = 0;				
-			} else {			
-				float ascent = diffy / diffx;
-			
-				// Intersection with horizontal map borders?
-				float interx = centery / ascent;
-				if (Math.abs(interx) <= centerx) {
-					// is really more above/below than to the side
-					
-					if (diffy < 0) {// above
-						targetPoint.x = (int)(centerx - interx);
-						targetPoint.y = 0;
-					} else {
-						targetPoint.x = (int)(centerx + interx);
-						targetPoint.y = mapSize.y;
-					}
-				} else {
-					float intery = centerx * ascent;
-					
-					if (diffx < 0) {
-						targetPoint.x = 0;
-						targetPoint.y = (int)(centery - intery);
-					} else {
-						targetPoint.x = mapSize.x;
-						targetPoint.y = (int)(centery + intery);
-					}
-				}
-			}			
+			targetPoint = intersectionWithBorder(targetPoint, mapSize);
 		}
 		
 		boolean showAccuracy = false;
@@ -195,6 +179,12 @@ public class PositionOverlay extends ItemizedOverlay<OverlayItem> {
 		if (isPosition && positionAccuracy > 0 && !isOutside) {
 			float projectedRadius = projection.metersToPixels(
 					positionAccuracy, father.getMapPosition().getZoomLevel());
+			
+			int quarterWidth = mapSize.x / 4;
+			
+			if (projectedRadius > quarterWidth)
+				projectedRadius = quarterWidth;
+			
 			if (projectedRadius > circleRadius) {
 				circleRadiusBack = projectedRadius;
 				showAccuracy = true;
@@ -205,7 +195,7 @@ public class PositionOverlay extends ItemizedOverlay<OverlayItem> {
 				targetPoint.x-circleRadiusBack, targetPoint.y-circleRadiusBack, 
 				targetPoint.x+circleRadiusBack, targetPoint.y+circleRadiusBack);
 		canvas.drawOval(circleAreaWider, background);
-		
+	
 		float circleRadiusFront = circleRadius;
 		if (showAccuracy)
 			circleRadiusFront = circleRadiusBack;
@@ -224,7 +214,93 @@ public class PositionOverlay extends ItemizedOverlay<OverlayItem> {
 				canvas.drawLine(circleArea.right, circleArea.top, 
 						circleArea.left, circleArea.bottom, foreground);
 			}
+		} else {
+			RectF outerArea = new RectF(
+					targetPoint.x-2*circleRadiusBack, targetPoint.y-2*circleRadiusBack, 
+					targetPoint.x+2*circleRadiusBack, targetPoint.y+2*circleRadiusBack);
+			
+			Paint outerPaint = new Paint(background);
+			outerPaint.setStrokeWidth(circleRadiusBack);
+			outerPaint.setStyle(Paint.Style.STROKE);
+					
+			canvas.drawOval(outerArea, outerPaint);
 		}
 		
+	}
+	
+	private Point intersectionWithBorder(Point targetPoint, Point mapSize) {
+		float centerx = mapSize.x / 2.0f;
+		float centery = mapSize.y / 2.0f;
+		
+		float diffx = targetPoint.x - centerx;
+		float diffy = targetPoint.y - centery;
+		
+		if (diffx == 0) {
+			targetPoint.x = (int)centerx;
+		
+			if (diffy < 0) // above				
+				targetPoint.y = 0;
+			else
+				targetPoint.y = mapSize.y;
+		} else if (diffy == 0) {
+			targetPoint.y = (int)centery;
+			
+			if (diffx > 0) // right
+				targetPoint.x = mapSize.x;
+			else
+				targetPoint.x = 0;				
+		} else {			
+			float ascent = diffy / diffx;
+		
+			// Intersection with horizontal map borders?
+			float interx = centery / ascent;
+			if (Math.abs(interx) <= centerx) {
+				// is really more above/below than to the side
+				
+				if (diffy < 0) {// above
+					targetPoint.x = (int)(centerx - interx);
+					targetPoint.y = 0;
+				} else {
+					targetPoint.x = (int)(centerx + interx);
+					targetPoint.y = mapSize.y;
+				}
+			} else {
+				float intery = centerx * ascent;
+				
+				if (diffx < 0) {
+					targetPoint.x = 0;
+					targetPoint.y = (int)(centery - intery);
+				} else {
+					targetPoint.x = mapSize.x;
+					targetPoint.y = (int)(centery + intery);
+				}
+			}
+		}
+		
+		return targetPoint;
+	}
+	
+
+	private void placeOrientation(Canvas canvas, Projection projection) {
+		Point wedgeCenter = new Point(father.getWidth() / 2, father.getHeight() / 2);
+		if (geoPosition != null) {
+			Point geoOnMap = projection.toPixels(geoPosition, null);
+			Point mapSize = new Point(father.getWidth(), father.getHeight());
+			if (!outside(geoOnMap, mapSize))
+				wedgeCenter = geoOnMap;
+		}
+		
+		float wedgeRadius = 10*circleRadius;
+		
+		RectF pieArea = new RectF(
+				wedgeCenter.x-wedgeRadius, wedgeCenter.y-wedgeRadius, 
+				wedgeCenter.x+wedgeRadius, wedgeCenter.y+wedgeRadius);
+		
+		// -90: 0° for drawArc is 3 o'clock
+		canvas.drawArc(pieArea, orientation - 35 - 90, 70, true, orientationPaint);
+	}
+	
+	private boolean outside(Point pos, Point size) {
+		return pos.x < 0 || pos.x >= size.x || pos.y < 0 || pos.y >= size.y;
 	}
 }

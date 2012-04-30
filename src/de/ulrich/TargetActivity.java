@@ -3,6 +3,8 @@ package de.ulrich;
 import org.mapsforge.core.GeoPoint;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.os.Bundle;
@@ -55,14 +57,14 @@ public class TargetActivity extends Activity {
         		fieldLon2.setText(lon2+"");
         		
         		if (targetPoint.latitudeE6 < 0)
-        			northIndicator.setText("S"); // TODO locale
+        			northIndicator.setText(getString(R.string.south_prefix));
         		else
-        			northIndicator.setText("N");
+        			northIndicator.setText(getString(R.string.north_prefix));
         		
         		if (targetPoint.longitudeE6 < 0)
-        			eastIndicator.setText("W"); // TODO locale
+        			eastIndicator.setText(getString(R.string.west_prefix));
         		else
-        			eastIndicator.setText("E");
+        			eastIndicator.setText(getString(R.string.east_prefix));
         	}
         }
 
@@ -124,12 +126,12 @@ public class TargetActivity extends Activity {
         		if (lat1 >= 0 && lat1 < 180 && lon1 >= 0 && lon1 < 180 
         				&& lat2Raw >= 0 && lat2Raw < 60 && lon2Raw >= 0 && lon2Raw < 60) {
         			
-        			if (northIndicator.getText().equals("S")) {
+        			if (northIndicator.getText().equals(getString(R.string.south_prefix))) {
         				lat1 *= -1;
         				lat2 *= -1;
         			}
         			
-        			if (eastIndicator.getText().equals("W")) {
+        			if (eastIndicator.getText().equals(getString(R.string.west_prefix))) {
         				lon1 *= -1;
         				lon2 *= -1;
         			}
@@ -139,7 +141,21 @@ public class TargetActivity extends Activity {
         		}
 	        	
         	} catch (NumberFormatException exc) {
-        		// TODO show error
+			 	// TODO make proper error
+			 	AlertDialog.Builder builder = new AlertDialog.Builder(this);
+			 	
+			 	builder.setMessage(getString(R.string.number_wrong)+". "+
+			 			getString(R.string.error_message)+": "+exc)
+			 	       .setCancelable(false)
+			 	       .setPositiveButton("Ok", new DialogInterface.OnClickListener() {
+			 	           public void onClick(DialogInterface dialog, int id) {
+			 	        	   dialog.dismiss();
+			 	           }
+			 	       });
+			 	AlertDialog alert = builder.create();
+			 	alert.show();
+			 	
+			 	// TODO correction possibility
         	}
     	}
     	

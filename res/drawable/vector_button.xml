@@ -20,6 +20,25 @@
                 android:bottom="6dp" />
         </shape>
     </item>
+    
+    <item android:state_checked="true" >
+        <shape>
+            <gradient
+                android:startColor="@color/red3"
+                android:endColor="@color/red2"
+                android:angle="270" />
+            <stroke
+                android:width="1dp"
+                android:color="@color/grey05" />
+            <corners
+                android:radius="3dp" />
+            <padding
+                android:left="6dp"
+                android:top="6dp"
+                android:right="6dp"
+                android:bottom="6dp" />
+        </shape>
+    </item>
 
     <item android:state_focused="true" >
         <shape>
