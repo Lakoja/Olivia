@@ -402,8 +402,10 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
 
 			if (lastActiveSatellites > 3) {
 				lastValidLocationMs = System.currentTimeMillis();
-				if (doSoundFirstFix)
+				if (doSoundFirstFix && !didSoundFirstFix) {
 					sounder.play(true);
+					didSoundFirstFix = true;
+				}
 			}
 			
 			boolean other = homingToggle.isSelected();
@@ -430,8 +432,8 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
 
 	public void onSatelliteInfo(int activeSatellites, int totalSatellites, float accuracy) {
 		String accuracyText = "";
-		if (accuracy > 0)
-			accuracyText = " ("+Math.round(accuracy)+"m)";
+		//if (accuracy > 0)
+		//	accuracyText = " ("+Math.round(accuracy)+"m)";
 		
 		textSatellites.setText(activeSatellites+"/"+totalSatellites+accuracyText);
 		
