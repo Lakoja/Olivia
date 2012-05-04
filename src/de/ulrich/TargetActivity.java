@@ -12,10 +12,13 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Spinner;
 
 
 public class TargetActivity extends Activity {
 	private boolean isCancelled;
+	
+	private Spinner targetNumber;
 
   	private EditText fieldLat1;
 	private EditText fieldLat2;
@@ -23,11 +26,20 @@ public class TargetActivity extends Activity {
 	private EditText fieldLon2;
 	private Button northIndicator;
 	private Button eastIndicator;
+	private Button copyCenter;
+	private Button copyPosition;
+	
+	private GeoPoint mapCenter;
+	private GeoPoint gpsPosition;
+	
+	// TODO take care of "return button"
 	
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);       
         setContentView(R.layout.target);
+        
+        targetNumber = (Spinner)findViewById(R.id.targetNumber);
  
 	  	fieldLat1 = (EditText)findViewById(R.id.targetLatitude1);
     	fieldLat2 = (EditText)findViewById(R.id.targetLatitude2);
@@ -37,35 +49,25 @@ public class TargetActivity extends Activity {
     	northIndicator = (Button)findViewById(R.id.northIndicator);
     	eastIndicator = (Button)findViewById(R.id.eastIndicator);
     	
+    	copyCenter = (Button)findViewById(R.id.copyCenter);
+    	copyPosition = (Button)findViewById(R.id.copyPosition);
+    	
         Bundle extras = getIntent().getExtras();
         
         if (extras != null) {
         	GeoPoint targetPoint = (GeoPoint)extras.getSerializable("targetPoint");
         	if (targetPoint != null) {
-        		// TODO might be negative??
-        		
-        		int lat1 = Math.abs(targetPoint.latitudeE6 / 1000000);
-        		double lat2 = Math.abs((targetPoint.latitudeE6 / 1000000.0 - lat1) * 60);
-        		lat2 = Math.round(lat2 * 1000) / 1000.0; // 3 digits after comma
-        		int lon1 = Math.abs(targetPoint.longitudeE6 / 1000000);
-        		double lon2 = Math.abs((targetPoint.longitudeE6 / 1000000.0 - lon1) * 60);
-        		lon2 = Math.round(lon2 * 1000) / 1000.0;
-        		
-        		fieldLat1.setText(lat1+"");
-        		fieldLat2.setText(lat2+"");
-        		fieldLon1.setText(lon1+"");
-        		fieldLon2.setText(lon2+"");
-        		
-        		if (targetPoint.latitudeE6 < 0)
-        			northIndicator.setText(getString(R.string.south_prefix));
-        		else
-        			northIndicator.setText(getString(R.string.north_prefix));
-        		
-        		if (targetPoint.longitudeE6 < 0)
-        			eastIndicator.setText(getString(R.string.west_prefix));
-        		else
-        			eastIndicator.setText(getString(R.string.east_prefix));
+        		setPointToFields(targetPoint);
         	}
+        	
+        	mapCenter = (GeoPoint)extras.getSerializable("mapCenter");
+        	gpsPosition = (GeoPoint)extras.getSerializable("gpsPosition");
+        	
+        	if (mapCenter == null)
+        		copyCenter.setClickable(false);
+        	if (gpsPosition == null)
+        		copyPosition.setClickable(false);
+        	
         }
 
         
@@ -101,6 +103,20 @@ public class TargetActivity extends Activity {
               		eastIndicator.setText("W");
             	else
             		eastIndicator.setText("W");
+            }
+        });
+        
+        copyCenter.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+              	if (mapCenter != null)
+              		setPointToFields(mapCenter);
+            }
+        });
+        
+        copyPosition.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+              	if (gpsPosition != null)
+              		setPointToFields(gpsPosition);
             }
         });
         
@@ -147,7 +163,7 @@ public class TargetActivity extends Activity {
 			 	builder.setMessage(getString(R.string.number_wrong)+". "+
 			 			getString(R.string.error_message)+": "+exc)
 			 	       .setCancelable(false)
-			 	       .setPositiveButton("Ok", new DialogInterface.OnClickListener() {
+			 	       .setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
 			 	           public void onClick(DialogInterface dialog, int id) {
 			 	        	   dialog.dismiss();
 			 	           }
@@ -161,8 +177,40 @@ public class TargetActivity extends Activity {
     	
     	Bundle data = new Bundle();
     	data.putSerializable("targetPoint", targetPoint);
+    	
+    	int selectedNumber = 0;
+    	if (targetNumber.getSelectedItemPosition() != Spinner.INVALID_POSITION)
+    		selectedNumber = targetNumber.getSelectedItemPosition();
+    	data.putInt("targetNumber", selectedNumber);
+    	
     	Intent dataIntent = new Intent();
     	dataIntent.putExtras(data);
     	setResult(0, dataIntent);
     }
+    
+    private void setPointToFields(GeoPoint targetPoint) {
+		
+		int lat1 = Math.abs(targetPoint.latitudeE6 / 1000000);
+		double lat2 = Math.abs((targetPoint.latitudeE6 / 1000000.0 - lat1) * 60);
+		lat2 = Math.round(lat2 * 1000) / 1000.0; // 3 digits after comma
+		int lon1 = Math.abs(targetPoint.longitudeE6 / 1000000);
+		double lon2 = Math.abs((targetPoint.longitudeE6 / 1000000.0 - lon1) * 60);
+		lon2 = Math.round(lon2 * 1000) / 1000.0;
+		
+		fieldLat1.setText(lat1+"");
+		fieldLat2.setText(lat2+"");
+		fieldLon1.setText(lon1+"");
+		fieldLon2.setText(lon2+"");
+		
+		if (targetPoint.latitudeE6 < 0)
+			northIndicator.setText(getString(R.string.south_prefix));
+		else
+			northIndicator.setText(getString(R.string.north_prefix));
+		
+		if (targetPoint.longitudeE6 < 0)
+			eastIndicator.setText(getString(R.string.west_prefix));
+		else
+			eastIndicator.setText(getString(R.string.east_prefix));
+    }
 }
+

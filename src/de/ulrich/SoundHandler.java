@@ -26,7 +26,7 @@ public class SoundHandler {
 			player.play(unnotifyId, 1, 1, 0, 0, 1);
 	}
 	
-	public void deconstruct() {
+	public void shutdown() {
 		player.release();
 	}
 }

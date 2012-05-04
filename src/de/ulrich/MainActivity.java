@@ -45,6 +45,8 @@ import org.mapsforge.map.reader.header.FileOpenResult;
 public class MainActivity extends MapActivity 
 implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTouchListener {
 	
+	private static MainActivity oneInstance;
+	
 	private static final int TARGET_ACTIVITY_CODE = 1;
 	private static final int SELECT_ACTIVITY_CODE = 2;
 	private static final int SETTINGS_ACTIVITY_CODE = 3;
@@ -61,7 +63,6 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
 	private MapFileHandler mapHandler;
 	
 	private MapView mapView;
-	private GeoPoint lastMapCenter;
 	private TextView textLatitude;
 	private TextView textLongitude;
 	private TextView textTargetDistance;
@@ -72,13 +73,10 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
 	
 	private PositionOverlay overlay;
 	
-	private boolean mapReplaced;
+	private boolean mapViewReplaced;
 	
 	private Handler handler = new Handler();
-	private JobQueue mapQueue;
-	private ProgressBar mapProgress;
 	
-    private DecimalFormat geoFormaterGrades = new DecimalFormat("000.0000");
     private DecimalFormat geoFormaterMinutes = new DecimalFormat("00.000");
     private DecimalFormat distanceFormaterKilo = new DecimalFormat("##0.0");
     
@@ -88,11 +86,17 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
     
     private double distance;
     private double bearing;
+    
+    public static MainActivity instance() {
+    	return oneInstance;
+    }
 	
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);       
         setContentView(R.layout.main);
+        
+        oneInstance = this;
         
         // Set  default values in prefs.xml (only once)
         PreferenceManager.setDefaultValues(this, R.xml.prefs, false);      
@@ -140,6 +144,12 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
         homingToggle.setOnClickListener(new View.OnClickListener() {
             public void onClick(View view) {
             	trackPosition = homingToggle.isChecked();
+            	
+            	SharedPreferences sharedPrefs = 
+            			PreferenceManager.getDefaultSharedPreferences(MainActivity.this);
+            	Editor ed = sharedPrefs.edit();
+            	ed.putBoolean("trackPosition", trackPosition);
+            	ed.commit();
 
             	if (trackPosition && overlay.getPosition() != null)
             		mapView.getController().setCenter(overlay.getPosition());
@@ -147,8 +157,8 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
         });
         //btnHoming.getBackground().setColorFilter(0xFFc0c0c0, PorterDuff.Mode.MULTIPLY);
 
-        ImageButton btnBleep = (ImageButton)findViewById(R.id.something);
-        btnBleep.setOnClickListener(new View.OnClickListener() {
+        ImageButton btnTarget = (ImageButton)findViewById(R.id.target);
+        btnTarget.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
             	showTargetSelector();
             }
@@ -162,13 +172,8 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
         });
         
         sounder = new SoundHandler(this);
-
-        mapQueue = mapView.getJobQueue();
-        mapProgress = (ProgressBar)findViewById(R.id.mapStateSpinner);
-
         
         overlay = new PositionOverlay(getWindowManager().getDefaultDisplay(), mapView);
-        overlay.setTarget(new GeoPoint(48.05, 7.8));
         
         mapView.getOverlays().add(overlay);
         
@@ -176,11 +181,12 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
         
         mapHandler = MapFileHandler.instance();
         if (mapHandler.hasValidPath()) {
-        	replaceMapView();
-        	loadMapFile(new File(mapHandler.getValidPath()));
+        	boolean mapSuccess = loadMapFile(new File(mapHandler.getValidPath()));
+        	if (mapSuccess)
+        		replaceMapView();        	
         }
 
-        if (savedInstanceState != null) {
+        if (savedInstanceState != null) {/*
 	        Object lastMapCenterO = savedInstanceState.getSerializable("lastMapCenter");
 	        if (lastMapCenterO != null) {
 	        	lastMapCenter = (GeoPoint)lastMapCenterO;
@@ -195,16 +201,47 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
 	        if (trackPosition)
 	        	homingToggle.setChecked(true);
 	        
-	        gpsHandler.restore(savedInstanceState);
 	        mapHandler.restore(savedInstanceState);
+	        */
+	        gpsHandler.restore(savedInstanceState);
+	        
         }
         
+        restorePreferences(sharedPrefs);        
         
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         
         new Thread(this).start();
     }
 
+
+	private void restorePreferences(SharedPreferences sharedPrefs) {
+		
+		// TODO care about "instance state" vs. shared preferences
+        if (overlay.getTarget() == null) {
+        	if (sharedPrefs.contains("lastTargetLatitude")) {
+        		float lat = sharedPrefs.getFloat("lastTargetLatitude", 0);
+        		float lon = sharedPrefs.getFloat("lastTargetLongitude", 0);
+        		GeoPoint gp = new GeoPoint(lat, lon);
+        		overlay.setTarget(gp);
+        	} else
+                overlay.setTarget(new GeoPoint(48.05, 7.8));
+        }
+               
+        if (!mapHandler.hasValidPath()) {
+        	if (sharedPrefs.contains("lastValidPath")) {
+        		String lastValidPath = sharedPrefs.getString("lastValidPath", null);
+        		boolean mapSuccess = loadMapFile(new File(lastValidPath));
+        		if (mapSuccess)
+        			mapHandler.setValidPath(lastValidPath);
+        	}
+        }
+        
+        homingToggle.setChecked(sharedPrefs.getBoolean("trackPosition", false));
+        
+        // TODO map saves the last map center...
+		
+	}
 
 	@Override
 	public void onSharedPreferenceChanged(SharedPreferences prefs, String key) {
@@ -254,11 +291,6 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
 				handler.post(new Runnable() {
 					public void run() {
 						
-						if (mapQueue.isEmpty())
-							mapProgress.setVisibility(View.INVISIBLE);
-						else
-							mapProgress.setVisibility(View.VISIBLE);
-						
 						//long now = System.currentTimeMillis();
 						//if (now - lastLocationChange >= 3000)
 						//	gpsStateView.setImageResource(R.drawable.gpsInactive);
@@ -266,10 +298,7 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
 						if (distance != 0)
 							textTargetDistance.setText(formatDistance(distance));
 						
-						//if (overlay.getPosition() != null)
-							textTargetBearing.setText(Math.round(bearing)+"°");
-						//else
-						//	textTargetBearing.setText(" ");
+						textTargetBearing.setText(Math.round(bearing)+"°");
 					}
 				});
 			}
@@ -300,19 +329,21 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
 	@Override
 	protected void onDestroy() {
 		super.onDestroy();
-		sounder.deconstruct();
+		sounder.shutdown();
 		gpsHandler.shutdown();
 	}
 	
 	protected void onSaveInstanceState(Bundle outState) {
+		/*
 		if (lastMapCenter != null)
 			outState.putSerializable("lastMapCenter", lastMapCenter);
 		if (overlay.getTarget() != null)
 			outState.putSerializable("lastTarget", overlay.getTarget());
 		outState.putBoolean("trackPosition", trackPosition);
-		
-		gpsHandler.save(outState);
 		mapHandler.save(outState);
+		*/
+		gpsHandler.save(outState);
+		// TODO what does this use?
 	}
 	
 	@Override
@@ -349,8 +380,18 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
 				Bundle data = dataIntent.getExtras();
 				if (data != null) {
 					GeoPoint gp = (GeoPoint)data.getSerializable("targetPoint");
-					if (gp != null)
+					if (gp != null) {
 						overlay.setTarget(gp);
+						
+						SharedPreferences sharedPrefs = 
+								PreferenceManager.getDefaultSharedPreferences(this);
+						Editor ed = sharedPrefs.edit();
+						ed.putFloat("lastTargetLatitude", (float)gp.getLatitude());
+						ed.putFloat("lastTargetLongitude", (float)gp.getLongitude());
+						ed.commit();
+						
+						// TODO a geo handler should handle this?
+					}
 				}
 			}
 		} else if (requestCode == SELECT_ACTIVITY_CODE) {
@@ -362,7 +403,7 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
 					if (mapSuccess) {
 						mapHandler.setValidPath(selectedFile.getAbsolutePath());
 						
-						if (!mapReplaced)
+						if (!mapViewReplaced)
 							replaceMapView();
 					}
 				}
@@ -408,23 +449,10 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
 				}
 			}
 			
-			boolean other = homingToggle.isSelected();
-			
 			if (trackPosition && !touchDown) {
 				mapView.getController().setCenter(location);
 			}
 						
-			/*
-			long now = System.currentTimeMillis();
-			int timeoutMinutes = gpsHandler.getTimoutMinutes();
-			if (timeoutMinutes > 0) {		
-				if (now - lastValidLocation > timeoutMinutes * 60 * 1000) {
-					Log.w("GpsStatus", "Location with last active sats "+lastActiveSatellites);
-					sounder.play(true); // TODO very first fix?
-				}
-			}
-			lastValidLocation = now;
-			*/
 		} else {
 			//sounder.play(false);
 		}
@@ -474,6 +502,9 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
         if (overlay.getTarget() != null) {
         	Bundle extras = new Bundle();
         	extras.putSerializable("targetPoint", overlay.getTarget());
+        	extras.putSerializable("mapCenter", mapView.getMapPosition().getMapCenter());
+        	if (overlay.getPosition() != null)
+        		extras.putSerializable("gpsPosition", overlay.getPosition());
         	intent.putExtras(extras);
         }
         intent.setClass(this, TargetActivity.class);
@@ -544,7 +575,7 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
         mapView.setLayoutParams(dummy.getLayoutParams());    
         layout.addView(mapView, 0);
         
-        mapReplaced = true;
+        mapViewReplaced = true;
 	}
 	
 	private String formatDistance(double distanceMeters) {

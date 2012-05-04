@@ -9,7 +9,6 @@
                 <LinearLayout android:id="@+id/linearLayout2" android:layout_height="wrap_content" android:layout_width="fill_parent" android:layout_weight="1">
                     <TextView style="@style/BwText" android:text="No" android:id="@+id/latitude" android:gravity="center_horizontal|clip_horizontal" android:background="@drawable/back_rect"></TextView>
                     <TextView style="@style/BwText" android:text="fix" android:id="@+id/longitude" android:gravity="center_horizontal|clip_horizontal"></TextView>
-                    <ProgressBar style="?android:attr/progressBarStyleSmall" android:id="@+id/mapStateSpinner" android:layout_height="20dp" android:layout_width="0dp"></ProgressBar>
                 </LinearLayout>
                 <LinearLayout android:id="@+id/linearLayout3" android:layout_height="wrap_content" android:layout_width="fill_parent" android:layout_weight="1">
                     <de.ulrich.MyImageView android:layout_height="20dp" android:src="@drawable/gpsInactive" android:id="@+id/gpsActive" android:layout_width="20dp"></de.ulrich.MyImageView>
@@ -18,7 +17,16 @@
                     <TextView style="@style/BwText" android:id="@+id/satellites" android:text="0/8" android:layout_weight="1"></TextView>
                 </LinearLayout>
             </LinearLayout>
-            <ImageButton android:layout_height="wrap_content" android:layout_weight="1" android:background="@drawable/vector_button" android:layout_margin="1dp" android:src="@drawable/ic_btn_arrow" android:id="@+id/something" android:layout_width="0dp"></ImageButton>
+
+            <ImageButton
+                android:id="@+id/target"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_margin="1dp"
+                android:layout_weight="1"
+                android:background="@drawable/vector_button"
+                android:src="@drawable/ic_btn_arrow" >
+</ImageButton>
         </LinearLayout>
         <LinearLayout android:layout_width="fill_parent" android:layout_height="wrap_content" android:id="@+id/dummyLayout" android:layout_weight="1">
             <FrameLayout android:layout_height="fill_parent" android:layout_width="fill_parent" android:id="@+id/dummyMap">

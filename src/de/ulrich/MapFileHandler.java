@@ -6,8 +6,11 @@ import java.util.List;
 
 import org.mapsforge.core.GeoPoint;
 
+import android.content.SharedPreferences;
+import android.content.SharedPreferences.Editor;
 import android.os.Bundle;
 import android.os.Environment;
+import android.preference.PreferenceManager;
 
 public class MapFileHandler {
 	
@@ -34,7 +37,10 @@ public class MapFileHandler {
 	    	File dir = Environment.getExternalStorageDirectory();
 	    	// "/sdcard/mapmap/baden-wuerttemberg-03.map"
 	    	
-	    	
+	    	SharedPreferences sharedPrefs = 
+	    		PreferenceManager.getDefaultSharedPreferences(MainActivity.instance());
+	    			
+	    	lastValidPath = sharedPrefs.getString("lastValidPath", null);
 	    }
 	}
 	
@@ -60,6 +66,12 @@ public class MapFileHandler {
 	
 	public void setValidPath(String path) {
 		lastValidPath = path;
+		
+		SharedPreferences sharedPrefs = 
+				PreferenceManager.getDefaultSharedPreferences(MainActivity.instance());
+		Editor ed = sharedPrefs.edit();
+		ed.putString("lastValidPath", path);
+		ed.commit();
 	}
 	
 	public File getRootDirectory() {

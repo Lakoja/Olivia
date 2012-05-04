@@ -27,4 +27,5 @@
     <string name="sound_first_fix_explain">Play sound on first GPS fix</string><string name="battery_save">Battery GPS</string>
     
     <string name="battery_save_explain">Battery percentage for GPS off</string>
+    <string name="target_number">Target number</string>
 </resources>
