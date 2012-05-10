@@ -2,6 +2,7 @@ package de.ulrich;
 
 import java.io.File;
 import java.text.DecimalFormat;
+import java.util.ArrayList;
 
 import android.app.AlertDialog;
 import android.content.Context;
@@ -43,7 +44,7 @@ import org.mapsforge.core.GeoPoint;
 import org.mapsforge.map.reader.header.FileOpenResult;
 
 public class MainActivity extends MapActivity 
-implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTouchListener {
+implements MyLocationListener, OnSharedPreferenceChangeListener, OnTouchListener {
 	
 	private static MainActivity oneInstance;
 	
@@ -207,27 +208,38 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
 	        
         }
         
-        restorePreferences(sharedPrefs);        
-        
+        restorePreferences(sharedPrefs);
+             
+		calcDistanceAndBearing();
+		setDistanceAndBearingTexts();
+              
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-        
-        new Thread(this).start();
     }
 
 
 	private void restorePreferences(SharedPreferences sharedPrefs) {
 		
 		// TODO care about "instance state" vs. shared preferences
-        if (overlay.getTarget() == null) {
-        	if (sharedPrefs.contains("lastTargetLatitude")) {
-        		float lat = sharedPrefs.getFloat("lastTargetLatitude", 0);
-        		float lon = sharedPrefs.getFloat("lastTargetLongitude", 0);
-        		GeoPoint gp = new GeoPoint(lat, lon);
-        		overlay.setTarget(gp);
-        	} else
-                overlay.setTarget(new GeoPoint(48.05, 7.8));
-        }
-               
+        
+		// TODO handle in PositionOverlay?
+		
+		ArrayList<GeoPoint> targetsNew = new ArrayList<GeoPoint>(10);
+		
+		int i = 0;
+		while (sharedPrefs.contains("targetLatitude" + i)) {
+    		float lat = sharedPrefs.getFloat("targetLatitude" + i, 0);
+    		float lon = sharedPrefs.getFloat("targetLongitude" + i, 0);
+    		targetsNew.add(new GeoPoint(lat, lon));		
+    		i++;
+		}		
+		if (targetsNew.size() <= 0) {
+			targetsNew.add(new GeoPoint(48.05, 7.8));
+		}
+		
+		overlay.setTargets(targetsNew);
+
+    
+        /*   
         if (!mapHandler.hasValidPath()) {
         	if (sharedPrefs.contains("lastValidPath")) {
         		String lastValidPath = sharedPrefs.getString("lastValidPath", null);
@@ -235,7 +247,7 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
         		if (mapSuccess)
         			mapHandler.setValidPath(lastValidPath);
         	}
-        }
+        }*/
         
         homingToggle.setChecked(sharedPrefs.getBoolean("trackPosition", false));
         
@@ -249,63 +261,62 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
     		doSoundFirstFix = prefs.getBoolean("soundFirstFix", false);
 	}
 	
+	/*
 	@Override
 	public void run() {
-		while (!isFinishing()) {
+		while (!isFinishing() && !paused) {
 			
-			if (!paused) {
-				if (overlay.getTarget() != null) {
-					// Calculate distance
-					GeoPoint origin = null;
-					if (overlay.getPosition() != null)
-						origin = overlay.getPosition();
-					else
-						origin = mapView.getMapPosition().getMapCenter();
+			if (overlay.getTarget() != null) {
+				// Calculate distance
+				GeoPoint origin = null;
+				if (overlay.getPosition() != null)
+					origin = overlay.getPosition();
+				else
+					origin = mapView.getMapPosition().getMapCenter();
+				
+				GeoPoint target = overlay.getTarget();
+
+				double lat1 = (origin.getLatitude() / 180) * Math.PI;
+				double lat2 = (target.getLatitude() / 180) * Math.PI;
+				double lon1 = (origin.getLongitude() / 180) * Math.PI;
+				double lon2 = (target.getLongitude() / 180) * Math.PI;
+				
+				// From http://www.kompf.de/gps/distcalc.html
+				distance = 6378388 * Math.acos(Math.sin(lat1) * Math.sin(lat2) + 
+						Math.cos(lat1) * Math.cos(lat2) * Math.cos(lon2 - lon1));
+				
+				if (overlay.getPosition() != null) {
+					int diffy = target.latitudeE6 - origin.latitudeE6;
+					int diffx = target.longitudeE6 - origin.longitudeE6;
 					
-					GeoPoint target = overlay.getTarget();
-	
-					double lat1 = (origin.getLatitude() / 180) * Math.PI;
-					double lat2 = (target.getLatitude() / 180) * Math.PI;
-					double lon1 = (origin.getLongitude() / 180) * Math.PI;
-					double lon2 = (target.getLongitude() / 180) * Math.PI;
+					bearing = 0;
 					
-					// From http://www.kompf.de/gps/distcalc.html
-					distance = 6378388 * Math.acos(Math.sin(lat1) * Math.sin(lat2) + 
-							Math.cos(lat1) * Math.cos(lat2) * Math.cos(lon2 - lon1));
-					
-					if (overlay.getPosition() != null) {
-						int diffy = target.latitudeE6 - origin.latitudeE6;
-						int diffx = target.longitudeE6 - origin.longitudeE6;
-						
-						bearing = 0;
-						
-						if (diffy != 0 || diffx != 0) {
-							bearing = Math.toDegrees(Math.atan2(diffx, diffy));
-							if (bearing < 0)
-								bearing = 360 + bearing;
-						}
+					if (diffy != 0 || diffx != 0) {
+						bearing = Math.toDegrees(Math.atan2(diffx, diffy));
+						if (bearing < 0)
+							bearing = 360 + bearing;
 					}
 				}
-				
-				
-				handler.post(new Runnable() {
-					public void run() {
-						
-						//long now = System.currentTimeMillis();
-						//if (now - lastLocationChange >= 3000)
-						//	gpsStateView.setImageResource(R.drawable.gpsInactive);
-					
-						if (distance != 0)
-							textTargetDistance.setText(formatDistance(distance));
-						
-						textTargetBearing.setText(Math.round(bearing)+"°");
-					}
-				});
 			}
 			
+			
+			handler.post(new Runnable() {
+				public void run() {
+					
+					//long now = System.currentTimeMillis();
+					//if (now - lastLocationChange >= 3000)
+					//	gpsStateView.setImageResource(R.drawable.gpsInactive);
+				
+					if (distance != 0)
+						textTargetDistance.setText(formatDistance(distance));
+					
+					textTargetBearing.setText(Math.round(bearing)+"°");
+				}
+			});
+		
 			try { Thread.sleep(500); } catch (InterruptedException exc) {}
 		}		
-	}
+	}*/
 	
 	@Override
     protected void onResume() {
@@ -314,6 +325,8 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
         if (isScreenOn) {
         	paused = false;
         	gpsHandler.resume();
+           
+            //new Thread(this).start();
         }
     }
 
@@ -381,13 +394,28 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
 				if (data != null) {
 					GeoPoint gp = (GeoPoint)data.getSerializable("targetPoint");
 					if (gp != null) {
-						overlay.setTarget(gp);
+						ArrayList<GeoPoint> targetsNew = new ArrayList<GeoPoint>(10);
+						targetsNew.add(gp);
+						// TODO multiple targets!
+						overlay.setTargets(targetsNew);
 						
 						SharedPreferences sharedPrefs = 
 								PreferenceManager.getDefaultSharedPreferences(this);
 						Editor ed = sharedPrefs.edit();
-						ed.putFloat("lastTargetLatitude", (float)gp.getLatitude());
-						ed.putFloat("lastTargetLongitude", (float)gp.getLongitude());
+						int i = 0;
+						for (; i<targetsNew.size(); i++) {
+							GeoPoint gpWrite = targetsNew.get(0);
+						
+							ed.putFloat("targetLatitude" + i, (float)gpWrite.getLatitude());
+							ed.putFloat("targetLongitude" + i, (float)gpWrite.getLongitude());
+						}
+						
+						while (sharedPrefs.contains("targetLatitude" + i)) {
+							ed.remove("targetLatitude" + i);
+							ed.remove("targetLongitude" + i);
+							i++;
+						}
+						
 						ed.commit();
 						
 						// TODO a geo handler should handle this?
@@ -429,6 +457,10 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
 	        	
 	        	touchStart = null;
 	        	touchDown = false;
+	        	
+	        	calcDistanceAndBearing();
+	    		setDistanceAndBearingTexts();
+	        	
 	        	break;
         }
 		return false;
@@ -440,6 +472,10 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
 		if (location != null) {
 			setLocationTexts(location.getLatitude(), location.getLongitude());		
 			overlay.setPosition(location, accuracy);
+			
+			calcDistanceAndBearing();
+			setDistanceAndBearingTexts();
+			
 
 			if (lastActiveSatellites > 3) {
 				lastValidLocationMs = System.currentTimeMillis();
@@ -474,6 +510,54 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
 		//textSatellites.setText(orientation+""); //geoFormaterGrades.format(orientation));
 	}
 	
+
+	private void calcDistanceAndBearing() {
+		if (overlay.hasTargets()) {
+			// Calculate distance
+			GeoPoint origin = null;
+			if (overlay.getPosition() != null)
+				origin = overlay.getPosition();
+			else
+				origin = mapView.getMapPosition().getMapCenter();
+			
+			// TODO multiple targets!
+			GeoPoint target = overlay.getTargets().get(0);
+
+			double lat1 = (origin.getLatitude() / 180) * Math.PI;
+			double lat2 = (target.getLatitude() / 180) * Math.PI;
+			double lon1 = (origin.getLongitude() / 180) * Math.PI;
+			double lon2 = (target.getLongitude() / 180) * Math.PI;
+			
+			// From http://www.kompf.de/gps/distcalc.html
+			distance = 6378388 * Math.acos(Math.sin(lat1) * Math.sin(lat2) + 
+					Math.cos(lat1) * Math.cos(lat2) * Math.cos(lon2 - lon1));
+			
+			if (overlay.getPosition() != null) {
+				int diffy = target.latitudeE6 - origin.latitudeE6;
+				int diffx = target.longitudeE6 - origin.longitudeE6;
+				
+				bearing = 0;
+				
+				if (diffy != 0 || diffx != 0) {
+					bearing = Math.toDegrees(Math.atan2(diffx, diffy));
+					if (bearing < 0)
+						bearing = 360 + bearing;
+				}
+			}
+		}		
+	}
+	
+	private void setDistanceAndBearingTexts() {
+		
+		if (distance != 0)
+			textTargetDistance.setText(formatDistance(distance));
+		
+		if (overlay.hasTargets())
+			textTargetBearing.setText(Math.round(bearing)+"°");
+		else
+			textTargetBearing.setText("");
+	}
+	
 	private void setLocationTexts(double lat, double lon) {
 		
 		String latitude = (lat >= 0 ? getString(R.string.north_prefix) : 
@@ -499,9 +583,10 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
 	
 	private void showTargetSelector() {
         Intent intent = new Intent();
-        if (overlay.getTarget() != null) {
+        if (overlay.hasTargets()) {
         	Bundle extras = new Bundle();
-        	extras.putSerializable("targetPoint", overlay.getTarget());
+        	// TODO multiple targets!
+        	extras.putSerializable("targetPoint", overlay.getTargets().get(0));
         	extras.putSerializable("mapCenter", mapView.getMapPosition().getMapCenter());
         	if (overlay.getPosition() != null)
         		extras.putSerializable("gpsPosition", overlay.getPosition());
@@ -525,12 +610,7 @@ implements MyLocationListener, Runnable, OnSharedPreferenceChangeListener, OnTou
 	}
 	
 	private void showSettingsSelector() {
-        Intent intent = new Intent();/*
-        if (overlay.getTarget() != null) {
-        	Bundle extras = new Bundle();
-        	extras.putSerializable("targetPoint", overlay.getTarget());
-        	intent.putExtras(extras);
-        }*/
+        Intent intent = new Intent();
         intent.setClass(this, SettingsActivity.class);
         startActivityForResult(intent, SETTINGS_ACTIVITY_CODE);
 	}

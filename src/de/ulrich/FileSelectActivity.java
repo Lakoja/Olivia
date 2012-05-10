@@ -32,9 +32,10 @@ implements AdapterView.OnItemClickListener, Comparator<File> {
         MapFileHandler filer = MapFileHandler.instance();
         
         List<File> fileLevel = null;
-        Bundle extras = getIntent().getExtras();        
+        Bundle extras = getIntent().getExtras();
+        File selectedFile = null;
         if (extras != null) {
-        	File selectedFile = (File)extras.getSerializable("selectedFile");
+        	selectedFile = (File)extras.getSerializable("selectedFile");
         	if (selectedFile != null) {
         		fileLevel = filer.getNextLevel(selectedFile.getParentFile());
         	}
@@ -45,7 +46,11 @@ implements AdapterView.OnItemClickListener, Comparator<File> {
         
         Collections.sort(fileLevel, this);
         
-        fileLevel.add(0, filer.getRootDirectory());
+        // TODO is a bit double code'ish
+        if (selectedFile == null)
+        	fileLevel.add(0, filer.getRootDirectory());
+        else
+        	fileLevel.add(0, selectedFile.getParentFile());
         
 		adapter = new FileAdapter(this, 0, fileLevel);		
 		setListAdapter(adapter);

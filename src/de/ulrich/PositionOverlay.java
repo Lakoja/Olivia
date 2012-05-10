@@ -1,5 +1,8 @@
 package de.ulrich;
 
+import java.util.LinkedList;
+import java.util.List;
+
 import org.mapsforge.android.maps.MapView;
 import org.mapsforge.android.maps.Projection;
 import org.mapsforge.android.maps.overlay.ItemizedOverlay;
@@ -21,7 +24,7 @@ public class PositionOverlay extends ItemizedOverlay<OverlayItem> {
 	private MapView father;
 	private GeoPoint geoPosition;
 	private float positionAccuracy;
-	private GeoPoint geoTarget;
+	private List<GeoPoint> geoTargets = new LinkedList<GeoPoint>();
 	private float orientation = -1;
 	
 	private Paint targetCirclePaint;
@@ -83,19 +86,19 @@ public class PositionOverlay extends ItemizedOverlay<OverlayItem> {
 			requestRedraw();
 	}
 	
-	public GeoPoint getTarget() {
-		return geoTarget;
+	public boolean hasTargets() {
+		return geoTargets.size() > 0;
 	}
 	
-	public void setTarget(GeoPoint gp) {
-		boolean redraw = false;
-		if (!gp.equals(geoTarget))
-			redraw = true;
-		
-		geoTarget = gp;
-		
-		if (redraw)
+	public List<GeoPoint> getTargets() {
+		return geoTargets;
+	}
+	
+	public void setTargets(List<GeoPoint> targetsNew) {
+		if (!targetsEqual(targetsNew)) {
+			geoTargets = targetsNew;
 			requestRedraw();
+		}
 	}
 	
 	public void setOrientation(float ori) {
@@ -123,9 +126,11 @@ public class PositionOverlay extends ItemizedOverlay<OverlayItem> {
 					positionCirclePaint, positionBackPaint);
 		}
 		
-		if (geoTarget != null) {
-			placePoint(geoTarget, false, canvas, projection, 
-					targetCirclePaint, targetBackPaint);
+		if (hasTargets()) {
+			for (GeoPoint geoTarget : geoTargets) {
+				placePoint(geoTarget, false, canvas, projection, 
+						targetCirclePaint, targetBackPaint);
+			}
 		}
 		
 		if (orientation >= 0) {
@@ -146,12 +151,23 @@ public class PositionOverlay extends ItemizedOverlay<OverlayItem> {
 		int count = 0;
 		if (geoPosition != null)
 			count++;
-		if (geoTarget != null)
-			count++;
+		count += geoTargets.size();
 		if (orientation >= 0)
 			count++;
 		count++; // map center
 		return count;
+	}
+	
+	private boolean targetsEqual(List<GeoPoint> targetsNew) {
+		if (targetsNew.size() != geoTargets.size())
+			return false;
+		
+		for (int i=0; i<geoTargets.size(); i++) {
+			if (!targetsNew.get(i).equals(geoTargets.get(i)))
+				return false;
+		}
+		
+		return true;
 	}
 
 	private void placePoint(GeoPoint geo, boolean isPosition, 

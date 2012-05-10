@@ -17,7 +17,7 @@ public class MapFileHandler {
 	private static MapFileHandler oneInstance;
 	
 	private boolean available;
-	private String lastValidPath;
+	private String validPath;
 	
 	private MapFileHandler() {
 
@@ -40,37 +40,26 @@ public class MapFileHandler {
 	    	SharedPreferences sharedPrefs = 
 	    		PreferenceManager.getDefaultSharedPreferences(MainActivity.instance());
 	    			
-	    	lastValidPath = sharedPrefs.getString("lastValidPath", null);
+	    	validPath = sharedPrefs.getString("validPath", null);
 	    }
-	}
-	
-	public void restore(Bundle savedState) {
-		if (savedState != null) {
-			lastValidPath = savedState.getString("lastValidPath");
-		}		
-	}
-	
-	public void save(Bundle outState) {
-		if (hasValidPath())
-			outState.putString("lastValidPath", lastValidPath);
 	}
 	
 	public boolean hasValidPath() {
 		// TODO must this also rely on "available"?
-		return lastValidPath != null && lastValidPath.length() > 0;
+		return validPath != null && validPath.length() > 0;
 	}
 	
 	public String getValidPath() {
-		return lastValidPath;
+		return validPath;
 	}
 	
 	public void setValidPath(String path) {
-		lastValidPath = path;
+		validPath = path;
 		
 		SharedPreferences sharedPrefs = 
 				PreferenceManager.getDefaultSharedPreferences(MainActivity.instance());
 		Editor ed = sharedPrefs.edit();
-		ed.putString("lastValidPath", path);
+		ed.putString("validPath", path);
 		ed.commit();
 	}
 	
