@@ -80,12 +80,10 @@ implements LocationListener, GpsStatus.Listener, SensorEventListener, OnSharedPr
 	
 	public void pause() {
 		if (!paused) {
-			Log.w("GpsStatus", "Pausing");
 			paused = true;
 	
 			// TODO pause also called when activity called
 			if (gpsActive && timeoutMinutes > 0) {
-				Log.w("GpsStatus", "Watcher started in pause() with "+timeoutMinutes);
 				watcher = new TimeoutWatch(this, timeoutMinutes);
 				watcher.start();
 			}
@@ -94,13 +92,11 @@ implements LocationListener, GpsStatus.Listener, SensorEventListener, OnSharedPr
 	
 	public void resume() {
 		if (paused) {
-			Log.w("GpsStatus", "Resuming");
 			paused = false;
 			
 	        sensorManager.registerListener(this, orientationSensor, SensorManager.SENSOR_DELAY_NORMAL);
 
 			if (watcher != null) {
-				Log.w("GpsStatus", "Watcher removed on resume()");
 				watcher.shutdown();
 				watcher = null;
 			}
@@ -116,6 +112,10 @@ implements LocationListener, GpsStatus.Listener, SensorEventListener, OnSharedPr
 	
 	public int getTimoutMinutes() {
 		return timeoutMinutes;
+	}
+	
+	public GeoPoint getLastLocation() {
+		return lastLocation;
 	}
 
 	@Override
@@ -174,8 +174,6 @@ implements LocationListener, GpsStatus.Listener, SensorEventListener, OnSharedPr
 			listener.onSatelliteInfo(countFix, countMax, lastAccuracy);			
 		}
 		
-		if (event == GpsStatus.GPS_EVENT_STOPPED)
-			Log.w("GpsStatus", "Provider stopped!");
 	}
 	
 	@Override
@@ -196,7 +194,6 @@ implements LocationListener, GpsStatus.Listener, SensorEventListener, OnSharedPr
 	}
 	
 	public void timeoutOccured() {
-		Log.w("GpsStatus", "Timeout with "+gpsActive);
 		if (gpsActive)
 			shutdown();
 	}
@@ -205,11 +202,9 @@ implements LocationListener, GpsStatus.Listener, SensorEventListener, OnSharedPr
         locationManager.removeUpdates(this);
         locationManager.removeGpsStatusListener(this);
 		if (watcher != null) {
-			Log.w("GpsStatus", "Watcher removed on shutdown()");
 			watcher.shutdown();
 			watcher = null;
 		}
-		Log.w("GpsStatus", "Signal inactivity");
         listener.onLocationChanged(null, 0); // signal inactivity
         gpsActive = false;
 	}

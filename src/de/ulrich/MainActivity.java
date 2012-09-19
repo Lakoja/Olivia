@@ -1,13 +1,16 @@
 package de.ulrich;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 
 import android.app.AlertDialog;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
@@ -16,6 +19,7 @@ import android.graphics.Color;
 import android.graphics.Point;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
+import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -35,13 +39,17 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 import android.widget.ToggleButton;
 
 import org.mapsforge.android.maps.MapActivity;
 import org.mapsforge.android.maps.MapView;
 import org.mapsforge.android.maps.mapgenerator.JobQueue;
+import org.mapsforge.android.maps.rendertheme.InternalRenderTheme;
 import org.mapsforge.core.GeoPoint;
+import org.mapsforge.map.reader.MapDatabase;
 import org.mapsforge.map.reader.header.FileOpenResult;
+import org.mapsforge.map.reader.header.MapFileInfo;
 
 public class MainActivity extends MapActivity 
 implements MyLocationListener, OnSharedPreferenceChangeListener, OnTouchListener {
@@ -76,11 +84,10 @@ implements MyLocationListener, OnSharedPreferenceChangeListener, OnTouchListener
 	
 	private boolean mapViewReplaced;
 	
-	private Handler handler = new Handler();
-	
     private DecimalFormat geoFormaterMinutes = new DecimalFormat("00.000");
     private DecimalFormat distanceFormaterKilo = new DecimalFormat("##0.0");
     
+    private BatteryHandler battery;
     private SoundHandler sounder;
     
     private boolean paused = true;
@@ -105,23 +112,37 @@ implements MyLocationListener, OnSharedPreferenceChangeListener, OnTouchListener
         sharedPrefs.registerOnSharedPreferenceChangeListener(this);
         onSharedPreferenceChanged(sharedPrefs, null);
         
+        float lowLevel = Integer.parseInt(sharedPrefs.getString("batterySave", "5")) / 100.0f;
+        battery = new BatteryHandler(this, lowLevel);
+        IntentFilter filter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+        registerReceiver(battery, filter);
+        
+        
         textLatitude = (TextView)findViewById(R.id.latitude);
         textLongitude = (TextView)findViewById(R.id.longitude);
         textTargetDistance = (TextView)findViewById(R.id.targetDistance);
         textTargetBearing = (TextView)findViewById(R.id.targetBearing);
         textSatellites = (TextView)findViewById(R.id.satellites);
         gpsStateView = (MyImageView)findViewById(R.id.gpsActive);
-               
-        mapView = new MapView(this);
-        mapView.setClickable(true);
-        mapView.setBuiltInZoomControls(false);
-        mapView.getMapScaleBar().setShowMapScaleBar(true);
-        mapView.setOnTouchListener(this);
-        //mapView.setMapViewMode(MapViewMode.MAPNIK_TILE_DOWNLOAD);
-  
-        	//loadMapFile(new File("/sdcard/mapmap/baden-wuerttemberg-03.map"));
+        
+        try {
+        	mapView = new MapView(this);
+        	
+            mapView.setClickable(true);
+            mapView.setBuiltInZoomControls(false);
+            mapView.getMapScaleBar().setShowMapScaleBar(true);
+            mapView.setOnTouchListener(this);
+            //mapView.setMapGenerator(new MultiDatabaseRenderer());
+            //mapView.setMapViewMode(MapViewMode.MAPNIK_TILE_DOWNLOAD);
+        } catch (IllegalArgumentException exc) {
+			String text = getString(R.string.invalid_map_view)+". "+
+		 			getString(R.string.error_message)+": "+exc.getMessage();
+			showError(text, true);
+			
+			// TODO can now be null and must specifically handled
+        }
 
-                 
+              
         ImageButton btnZoomIn = (ImageButton)findViewById(R.id.zoomIn);
         btnZoomIn.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
@@ -144,16 +165,7 @@ implements MyLocationListener, OnSharedPreferenceChangeListener, OnTouchListener
         homingToggle = (ToggleButton)findViewById(R.id.homing);
         homingToggle.setOnClickListener(new View.OnClickListener() {
             public void onClick(View view) {
-            	trackPosition = homingToggle.isChecked();
-            	
-            	SharedPreferences sharedPrefs = 
-            			PreferenceManager.getDefaultSharedPreferences(MainActivity.this);
-            	Editor ed = sharedPrefs.edit();
-            	ed.putBoolean("trackPosition", trackPosition);
-            	ed.commit();
-
-            	if (trackPosition && overlay.getPosition() != null)
-            		mapView.getController().setCenter(overlay.getPosition());
+            	setNewHoming();
             }
         });
         //btnHoming.getBackground().setColorFilter(0xFFc0c0c0, PorterDuff.Mode.MULTIPLY);
@@ -176,7 +188,8 @@ implements MyLocationListener, OnSharedPreferenceChangeListener, OnTouchListener
         
         overlay = new PositionOverlay(getWindowManager().getDefaultDisplay(), mapView);
         
-        mapView.getOverlays().add(overlay);
+        if (mapView != null)
+        	mapView.getOverlays().add(overlay);
         
         gpsHandler = new LocationHandler(this);
         
@@ -260,46 +273,9 @@ implements MyLocationListener, OnSharedPreferenceChangeListener, OnTouchListener
 		if (key == null || key.equals("soundFirstFix"))
     		doSoundFirstFix = prefs.getBoolean("soundFirstFix", false);
 	}
-	
-	/*
-	@Override
-	public void run() {
-		while (!isFinishing() && !paused) {
-			
-			if (overlay.getTarget() != null) {
-				// Calculate distance
-				GeoPoint origin = null;
-				if (overlay.getPosition() != null)
-					origin = overlay.getPosition();
-				else
-					origin = mapView.getMapPosition().getMapCenter();
-				
-				GeoPoint target = overlay.getTarget();
 
-				double lat1 = (origin.getLatitude() / 180) * Math.PI;
-				double lat2 = (target.getLatitude() / 180) * Math.PI;
-				double lon1 = (origin.getLongitude() / 180) * Math.PI;
-				double lon2 = (target.getLongitude() / 180) * Math.PI;
-				
-				// From http://www.kompf.de/gps/distcalc.html
-				distance = 6378388 * Math.acos(Math.sin(lat1) * Math.sin(lat2) + 
-						Math.cos(lat1) * Math.cos(lat2) * Math.cos(lon2 - lon1));
-				
-				if (overlay.getPosition() != null) {
-					int diffy = target.latitudeE6 - origin.latitudeE6;
-					int diffx = target.longitudeE6 - origin.longitudeE6;
-					
-					bearing = 0;
-					
-					if (diffy != 0 || diffx != 0) {
-						bearing = Math.toDegrees(Math.atan2(diffx, diffy));
-						if (bearing < 0)
-							bearing = 360 + bearing;
-					}
-				}
-			}
 			
-			
+			/*
 			handler.post(new Runnable() {
 				public void run() {
 					
@@ -315,8 +291,7 @@ implements MyLocationListener, OnSharedPreferenceChangeListener, OnTouchListener
 			});
 		
 			try { Thread.sleep(500); } catch (InterruptedException exc) {}
-		}		
-	}*/
+			*/
 	
 	@Override
     protected void onResume() {
@@ -324,7 +299,8 @@ implements MyLocationListener, OnSharedPreferenceChangeListener, OnTouchListener
         boolean isScreenOn = ((PowerManager) getSystemService(Context.POWER_SERVICE)).isScreenOn();
         if (isScreenOn) {
         	paused = false;
-        	gpsHandler.resume();
+        	if (battery.isBatteryOk())
+        		gpsHandler.resume();
            
             //new Thread(this).start();
         }
@@ -332,7 +308,7 @@ implements MyLocationListener, OnSharedPreferenceChangeListener, OnTouchListener
 
 	@Override
     protected void onPause() {
-        super.onPause();
+		super.onPause();
         if (!paused) {
         	paused = true;
         	gpsHandler.pause();
@@ -451,8 +427,10 @@ implements MyLocationListener, OnSharedPreferenceChangeListener, OnTouchListener
 	        case(MotionEvent.ACTION_UP):
 	        	Point touchEnd = new Point((int)event.getX(), (int)event.getY());
 	        	if (!touchEnd.equals(touchStart)) {
-	        		homingToggle.setChecked(false);
-	        		trackPosition = false;
+	        		if (homingToggle.isChecked()) {
+	        			homingToggle.setChecked(false);
+	        			setNewHoming();
+	        		}
 	        	}
 	        	
 	        	touchStart = null;
@@ -485,7 +463,7 @@ implements MyLocationListener, OnSharedPreferenceChangeListener, OnTouchListener
 				}
 			}
 			
-			if (trackPosition && !touchDown) {
+			if (trackPosition && !touchDown && mapView != null) {
 				mapView.getController().setCenter(location);
 			}
 						
@@ -494,13 +472,8 @@ implements MyLocationListener, OnSharedPreferenceChangeListener, OnTouchListener
 		}
 	}
 
-	public void onSatelliteInfo(int activeSatellites, int totalSatellites, float accuracy) {
-		String accuracyText = "";
-		//if (accuracy > 0)
-		//	accuracyText = " ("+Math.round(accuracy)+"m)";
-		
-		textSatellites.setText(activeSatellites+"/"+totalSatellites+accuracyText);
-		
+	public void onSatelliteInfo(int activeSatellites, int totalSatellites, float accuracy) {		
+		textSatellites.setText(activeSatellites+"/"+totalSatellites);		
 		lastActiveSatellites = activeSatellites;
 	}
 	
@@ -510,6 +483,14 @@ implements MyLocationListener, OnSharedPreferenceChangeListener, OnTouchListener
 		//textSatellites.setText(orientation+""); //geoFormaterGrades.format(orientation));
 	}
 	
+	public void batteryStatus(boolean good) {
+		if (!good)
+			gpsHandler.shutdown();
+		
+		// TODO switch back on
+		// TODO test
+	}
+	
 
 	private void calcDistanceAndBearing() {
 		if (overlay.hasTargets()) {
@@ -517,31 +498,33 @@ implements MyLocationListener, OnSharedPreferenceChangeListener, OnTouchListener
 			GeoPoint origin = null;
 			if (overlay.getPosition() != null)
 				origin = overlay.getPosition();
-			else
+			else if (mapView != null)
 				origin = mapView.getMapPosition().getMapCenter();
 			
-			// TODO multiple targets!
-			GeoPoint target = overlay.getTargets().get(0);
-
-			double lat1 = (origin.getLatitude() / 180) * Math.PI;
-			double lat2 = (target.getLatitude() / 180) * Math.PI;
-			double lon1 = (origin.getLongitude() / 180) * Math.PI;
-			double lon2 = (target.getLongitude() / 180) * Math.PI;
-			
-			// From http://www.kompf.de/gps/distcalc.html
-			distance = 6378388 * Math.acos(Math.sin(lat1) * Math.sin(lat2) + 
-					Math.cos(lat1) * Math.cos(lat2) * Math.cos(lon2 - lon1));
-			
-			if (overlay.getPosition() != null) {
-				int diffy = target.latitudeE6 - origin.latitudeE6;
-				int diffx = target.longitudeE6 - origin.longitudeE6;
+			if (origin != null) {
+				// TODO multiple targets!
+				GeoPoint target = overlay.getTargets().get(0);
+	
+				double lat1 = (origin.getLatitude() / 180) * Math.PI;
+				double lat2 = (target.getLatitude() / 180) * Math.PI;
+				double lon1 = (origin.getLongitude() / 180) * Math.PI;
+				double lon2 = (target.getLongitude() / 180) * Math.PI;
 				
-				bearing = 0;
+				// From http://www.kompf.de/gps/distcalc.html
+				distance = 6378388 * Math.acos(Math.sin(lat1) * Math.sin(lat2) + 
+						Math.cos(lat1) * Math.cos(lat2) * Math.cos(lon2 - lon1));
 				
-				if (diffy != 0 || diffx != 0) {
-					bearing = Math.toDegrees(Math.atan2(diffx, diffy));
-					if (bearing < 0)
-						bearing = 360 + bearing;
+				if (overlay.getPosition() != null) {
+					int diffy = target.latitudeE6 - origin.latitudeE6;
+					int diffx = target.longitudeE6 - origin.longitudeE6;
+					
+					bearing = 0;
+					
+					if (diffy != 0 || diffx != 0) {
+						bearing = Math.toDegrees(Math.atan2(diffx, diffy));
+						if (bearing < 0)
+							bearing = 360 + bearing;
+					}
 				}
 			}
 		}		
@@ -597,8 +580,6 @@ implements MyLocationListener, OnSharedPreferenceChangeListener, OnTouchListener
 	}
 	
 	private void showMapSelector() {
-     	//bleeper.play(true);
-     	
         Intent intent = new Intent();
         if (mapHandler.hasValidPath()) {
         	Bundle extras = new Bundle();
@@ -619,28 +600,57 @@ implements MyLocationListener, OnSharedPreferenceChangeListener, OnTouchListener
 		File activeMap = mapView.getMapFile();
 		
 		if (!selected.equals(activeMap)) {
+	    	SharedPreferences sharedPrefs = 
+	    			PreferenceManager.getDefaultSharedPreferences(MainActivity.this);
+	    	
+			if (activeMap.exists()) {
+				GeoPoint gpOldMapCenter = mapView.getMapPosition().getMapCenter();
+				
+		    	Editor ed = sharedPrefs.edit();
+		    	ed.putFloat("mapFileLatitude_"+activeMap.getName(), (float)gpOldMapCenter.getLatitude());
+		    	ed.putFloat("mapFileLongitude_"+activeMap.getName(), (float)gpOldMapCenter.getLongitude());
+		    	ed.putInt("mapFileZoom_"+activeMap.getName(), mapView.getMapPosition().getZoomLevel());
+		    	ed.commit();
+			}
+	
+			//((MultiDatabaseRenderer)mapView.getMapGenerator()).setFile(selected);
 	        FileOpenResult result = mapView.setMapFile(selected);
 	        
 			if (!result.isSuccess()) {
-			 	Log.e(this.getClass().toString(), "No valid map");
 			 	
-			 	// TODO make proper error
-			 	AlertDialog.Builder builder = new AlertDialog.Builder(this);
-			 	
-			 	builder.setMessage(getString(R.string.invalid_map_file)+". "+
-			 			getString(R.string.error_message)+": "+result.getErrorMessage())
-			 	       .setCancelable(false)
-			 	       .setPositiveButton("Ok", new DialogInterface.OnClickListener() {
-			 	           public void onClick(DialogInterface dialog, int id) {
-			 	        	   dialog.dismiss();
-			 	           }
-			 	       });
-			 	AlertDialog alert = builder.create();
-			 	alert.show();
+				String text = getString(R.string.invalid_map_file)+". "+
+			 			getString(R.string.error_message)+": "+result.getErrorMessage();
+				showError(text, false);
 			 	
 			 	return false;
 			}
-		}
+			
+			if (trackPosition && gpsHandler.getLastLocation() != null) {			
+				mapView.getController().setCenter(gpsHandler.getLastLocation());
+			} else {
+				if (sharedPrefs.contains("mapFileLatitude_"+selected.getName())) {
+		    		float lat = sharedPrefs.getFloat("mapFileLatitude_"+selected.getName(), 0);
+		    		float lon = sharedPrefs.getFloat("mapFileLongitude_"+selected.getName(), 0);
+			
+		    		GeoPoint gpNewMapCenter = new GeoPoint(lat, lon);
+		    		mapView.getController().setCenter(gpNewMapCenter);
+		    		
+		    		byte zoom = (byte)sharedPrefs.getInt("mapFileZoom_"+activeMap.getName(), 13);
+		    		mapView.getController().setZoom(zoom);
+				}
+			}
+
+		} /*else {
+			((MultiDatabaseRenderer)mapView.getMapGenerator()).setFile(selected);
+			
+			File otherRenderer = new File(selected.getParent(), "somerenderer.xml");
+			if (otherRenderer.exists())
+				try {
+					mapView.setRenderTheme(otherRenderer);
+				} catch (FileNotFoundException e) {
+
+				}
+		}*/
 		
 		return true;
 	}
@@ -650,12 +660,16 @@ implements MyLocationListener, OnSharedPreferenceChangeListener, OnTouchListener
         
         LinearLayout layout = (LinearLayout)findViewById(R.id.dummyLayout);      
         View dummy = findViewById(R.id.dummyMap);       
-        layout.removeView(dummy);
+        layout.removeView(dummy);       
        
         mapView.setLayoutParams(dummy.getLayoutParams());    
         layout.addView(mapView, 0);
         
         mapViewReplaced = true;
+	}
+		
+	private void showNotification(String text) {
+		Toast.makeText(this, text, Toast.LENGTH_SHORT).show();
 	}
 	
 	private String formatDistance(double distanceMeters) {
@@ -672,5 +686,41 @@ implements MyLocationListener, OnSharedPreferenceChangeListener, OnTouchListener
 			return Math.round(distanceMeters) + " m";
 	}
 
+	private void setNewHoming() {
+    	trackPosition = homingToggle.isChecked();
+    	
+    	String notifyText = getString(R.string.homing)+" ";
+    	if (trackPosition)
+    		notifyText += getString(R.string.on);
+    	else
+    		notifyText += getString(R.string.off);
+    	
+    	showNotification(notifyText);
+    	
+    	
+    	SharedPreferences sharedPrefs = 
+    			PreferenceManager.getDefaultSharedPreferences(MainActivity.this);
+    	Editor ed = sharedPrefs.edit();
+    	ed.putBoolean("trackPosition", trackPosition);
+    	ed.commit();
 
+    	if (trackPosition && overlay.getPosition() != null)
+    		mapView.getController().setCenter(overlay.getPosition());
+	}
+	
+	private void showError(String text, final boolean fatal) {
+	 	AlertDialog.Builder builder = new AlertDialog.Builder(this);
+	 	
+	 	builder.setMessage(text)
+	 	       .setCancelable(false)
+	 	       .setPositiveButton("Ok", new DialogInterface.OnClickListener() {
+	 	           public void onClick(DialogInterface dialog, int id) {
+	 	        	   dialog.dismiss();
+	 	        	   if (fatal)
+	 	        		   MainActivity.this.finish();
+	 	           }
+	 	       });
+	 	AlertDialog alert = builder.create();
+	 	alert.show();
+	}
 }

@@ -13,6 +13,7 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Spinner;
+import android.widget.Toast;
 
 
 public class TargetActivity extends Activity {
@@ -28,6 +29,9 @@ public class TargetActivity extends Activity {
 	private Button eastIndicator;
 	private Button copyCenter;
 	private Button copyPosition;
+	
+	private EditText fieldGrades;
+	private EditText fieldMeters;
 	
 	private GeoPoint mapCenter;
 	private GeoPoint gpsPosition;
@@ -51,6 +55,9 @@ public class TargetActivity extends Activity {
     	
     	copyCenter = (Button)findViewById(R.id.copyCenter);
     	copyPosition = (Button)findViewById(R.id.copyPosition);
+    	
+    	fieldGrades = (EditText)findViewById(R.id.grades);
+    	fieldMeters = (EditText)findViewById(R.id.meters);
     	
         Bundle extras = getIntent().getExtras();
         
@@ -108,15 +115,37 @@ public class TargetActivity extends Activity {
         
         copyCenter.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-              	if (mapCenter != null)
+              	if (mapCenter != null) {
+              		showNotification(getString(R.string.center_taken));
               		setPointToFields(mapCenter);
+              	}
             }
         });
         
         copyPosition.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-              	if (gpsPosition != null)
+              	if (gpsPosition != null) {
+              		showNotification(getString(R.string.position_taken));
               		setPointToFields(gpsPosition);
+              	}
+            }
+        });
+        
+        Button btnBearing = (Button)findViewById(R.id.doBearing);
+        btnBearing.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+            	GeoPoint current = extractPointFromFields();
+            	
+            	GeoPoint newTarget = doBearing(current);
+            	
+            	// TODO
+          		//showNotification(getString(R.string.position_taken));
+            	
+            	if (newTarget != null)
+            		setPointToFields(newTarget);
+            	// TODO else
+            	
+            	// TODO NumberFormatException
             }
         });
         
@@ -132,29 +161,7 @@ public class TargetActivity extends Activity {
     	GeoPoint targetPoint = null;
     	if (!isCancelled) {
         	try {
-        		int lat1 = Integer.parseInt(fieldLat1.getText().toString());
-        		double lat2Raw = Double.parseDouble(fieldLat2.getText().toString());
-        		double lat2 = lat2Raw / 60;
-        		int lon1 = Integer.parseInt(fieldLon1.getText().toString());
-        		double lon2Raw = Double.parseDouble(fieldLon2.getText().toString());
-        		double lon2 = lon2Raw / 60;
-        		
-        		if (lat1 >= 0 && lat1 < 180 && lon1 >= 0 && lon1 < 180 
-        				&& lat2Raw >= 0 && lat2Raw < 60 && lon2Raw >= 0 && lon2Raw < 60) {
-        			
-        			if (northIndicator.getText().equals(getString(R.string.south_prefix))) {
-        				lat1 *= -1;
-        				lat2 *= -1;
-        			}
-        			
-        			if (eastIndicator.getText().equals(getString(R.string.west_prefix))) {
-        				lon1 *= -1;
-        				lon2 *= -1;
-        			}
-        			
-        			targetPoint = new GeoPoint(lat1 * 1000000 + (int)Math.round(lat2 * 1000000), 
-        					lon1 * 1000000 + (int)Math.round(lon2 * 1000000));
-        		}
+        		targetPoint = extractPointFromFields();
 	        	
         	} catch (NumberFormatException exc) {
 			 	// TODO make proper error
@@ -188,7 +195,35 @@ public class TargetActivity extends Activity {
     	setResult(0, dataIntent);
     }
     
-    private void setPointToFields(GeoPoint targetPoint) {
+    private GeoPoint extractPointFromFields() throws NumberFormatException {
+		int lat1 = Integer.parseInt(fieldLat1.getText().toString());
+		double lat2Raw = Double.parseDouble(fieldLat2.getText().toString());
+		double lat2 = lat2Raw / 60;
+		int lon1 = Integer.parseInt(fieldLon1.getText().toString());
+		double lon2Raw = Double.parseDouble(fieldLon2.getText().toString());
+		double lon2 = lon2Raw / 60;
+		
+		if (lat1 >= 0 && lat1 < 180 && lon1 >= 0 && lon1 < 180 
+				&& lat2Raw >= 0 && lat2Raw < 60 && lon2Raw >= 0 && lon2Raw < 60) {
+			
+			if (northIndicator.getText().equals(getString(R.string.south_prefix))) {
+				lat1 *= -1;
+				lat2 *= -1;
+			}
+			
+			if (eastIndicator.getText().equals(getString(R.string.west_prefix))) {
+				lon1 *= -1;
+				lon2 *= -1;
+			}
+			
+			return new GeoPoint(lat1 * 1000000 + (int)Math.round(lat2 * 1000000), 
+					lon1 * 1000000 + (int)Math.round(lon2 * 1000000));
+		}
+		
+		return null;
+	}
+
+	private void setPointToFields(GeoPoint targetPoint) {
 		
 		int lat1 = Math.abs(targetPoint.latitudeE6 / 1000000);
 		double lat2 = Math.abs((targetPoint.latitudeE6 / 1000000.0 - lat1) * 60);
@@ -212,5 +247,35 @@ public class TargetActivity extends Activity {
 		else
 			eastIndicator.setText(getString(R.string.east_prefix));
     }
+	
+
+	private GeoPoint doBearing(GeoPoint current) throws NumberFormatException {
+		double grades = Double.parseDouble(fieldGrades.getText().toString());
+		double meters = Double.parseDouble(fieldMeters.getText().toString());
+    	
+		double digestible = (grades / 180) * Math.PI;
+		
+		double northMeters = Math.cos(digestible) * meters;
+		double eastMeters = Math.sin(digestible) * meters;
+		
+		// 1850m per minute (for latitude)
+    	
+		double lat1 = current.getLatitude();
+		double lat2 = lat1 + northMeters / (1850 * 60);
+		double lon1 = current.getLongitude();
+		double digestible2 = (((lat1 + lat2) / 2) / 180) * Math.PI;
+		double below = 1850 * 60 * Math.cos(digestible2);
+		double lon2 = lon1;
+		if (below != 0)
+			lon2 += eastMeters / below;
+		
+		GeoPoint newTarget = new GeoPoint(lat2, lon2);
+		
+		return newTarget;
+	}
+    
+	public void showNotification(String text) {
+		Toast.makeText(this, text, Toast.LENGTH_SHORT).show();
+	}
 }
 

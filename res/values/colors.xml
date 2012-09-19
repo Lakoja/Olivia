@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+	<color name="grey02">#444</color>
 	<color name="grey03">#999</color>
 	<color name="grey05">#ccc</color>
 	<color name="grey06">#ddd</color>
